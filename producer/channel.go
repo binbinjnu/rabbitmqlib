@@ -175,7 +175,7 @@ FOR1:
 					log.Println("Channel:", chS.index, " change to true message num is ", queue.Messages)
 					chS.isThrottling = true
 					continue FOR2
-				} else if queue.Messages < chS.volume && chS.isThrottling == true {
+				} else if queue.Messages <= (chS.volume/2) && chS.isThrottling == true {
 					// 低于容量且已限流
 					log.Println("Channel:", chS.index, " change to false message num is ", queue.Messages)
 					chS.isThrottling = false
