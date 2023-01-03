@@ -4,7 +4,7 @@ package consumer
 
 import (
 	"github.com/streadway/amqp"
-	"log"
+	"go.slotsdev.info/server-group/gamelib/log"
 	"strconv"
 	"time"
 )
@@ -49,10 +49,10 @@ FOR1:
 		chS.isReady = false
 		err := chS.init(conn)
 		//err := errors.New("abc")
-		log.Println("Init channel: ", chS.index)
+		log.Info("Init channel: ", chS.index)
 
 		if err != nil {
-			log.Println("Failed to init channel. Retrying...")
+			log.Warn("Failed to init channel. Retrying...")
 			select {
 			case <-chS.done:
 				chS.isReady = false
@@ -68,19 +68,22 @@ FOR1:
 			select {
 			case <-chS.done:
 				chS.isReady = false
-				log.Println("Done channel : ", chS.index)
+				log.Info("Done channel : ", chS.index)
 				break FOR1
 
 			case <-chS.notifyChanClose:
 				// break FOR2, 重新跑FOR1循环
-				log.Println("Notify close channel : ", chS.index, " Rerunning init...")
+				log.Warn("Notify close channel : ", chS.index, " Rerunning init...")
 				// 将chS.pushMap中的所有数据都返回
 				break FOR2
 
 			case d := <-chS.delivery:
-				log.Println("d:", string(d.Body))
-				d.Ack(false)
-
+				log.Debug("d:", string(d.Body))
+				err := callback(d.Body)
+				if err == nil {
+					log.Error("callback err: ", err)
+					d.Ack(false)
+				}
 			}
 		}
 	}
@@ -130,6 +133,6 @@ func (chS *ChSession) init(conn *amqp.Connection) error {
 	chS.delivery = delivery
 
 	chS.isReady = true
-	log.Println("Channel setup success!")
+	log.Info("Channel setup success!")
 	return nil
 }

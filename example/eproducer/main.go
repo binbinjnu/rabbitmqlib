@@ -1,9 +1,9 @@
 package main
 
 import (
-	"log"
-	"rabbitmqlib/example/util"
-	"rabbitmqlib/producer"
+	"go.slotsdev.info/server-group/gamelib/log"
+	"go.slotsdev.info/server-group/rabbitmqlib/example/util"
+	"go.slotsdev.info/server-group/rabbitmqlib/producer"
 	"time"
 )
 
@@ -21,16 +21,16 @@ func main() {
 	addr := "amqp://admin:123456@192.168.146.128:5672"
 	err := producer.NewProducer("dm_queue_", addr, 2, 100)
 	if err != nil {
-		log.Println("err:", err)
+		log.Debug("err:", err)
 		return
 	}
 
-	log.Println("before time sleep")
+	log.Debug("before time sleep")
 	time.Sleep(10 * time.Second)
-	log.Println("after time sleep")
+	log.Debug("after time sleep")
 	for i := 0; i < 10; i++ {
 		producer.SendMsg(map[string]interface{}{"int": i, "string": "abc"})
-		time.Sleep(3 * time.Second)
+		time.Sleep(400 * time.Millisecond)
 	}
 	//mymq.Send([]byte("abc"))
 	//mymq.Send([]byte("efg"))

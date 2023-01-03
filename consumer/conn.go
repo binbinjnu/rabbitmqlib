@@ -5,7 +5,7 @@ package consumer
 
 import (
 	"github.com/streadway/amqp"
-	"log"
+	"go.slotsdev.info/server-group/gamelib/log"
 	"time"
 )
 
@@ -53,14 +53,14 @@ func (connS *ConnSession) handleConn(addr string) {
 FOR1:
 	for {
 		connS.isReady = false
-		log.Println("Attempting to connect")
+		log.Info("Attempting to connect")
 		conn, err := connS.connect(addr)
 		if err != nil {
-			log.Println("Failed to connect. Retrying...")
+			log.Warn("Failed to connect. Retrying...")
 			select {
 			case <-connS.done:
 				connS.isReady = false
-				log.Println("Conn done in FOR1!")
+				log.Info("Conn done in FOR1!")
 				// 在conn错误的时候,收到done的信息, 直接关闭整个协程
 				break FOR1
 			case <-time.After(reconnectDelay):
@@ -84,12 +84,12 @@ FOR1:
 			select {
 			case <-connS.done:
 				connS.isReady = false
-				log.Println("Conn done in FOR2!")
+				log.Info("Conn done in FOR2!")
 				// 运行过程中, 收到done消息, 直接关掉整个协程
 				break FOR1
 			case <-connS.notifyConnClose:
 				// 运行过程中, 收到ConnClose的消息, 重新跑FOR1循环进行重连
-				log.Println("Conn closed. Rerunning conn...")
+				log.Warn("Conn closed. Rerunning conn...")
 				// 关掉旧的channel
 				for _, v := range connS.channelMap {
 					v.closeChSession()
@@ -113,7 +113,7 @@ func (connS *ConnSession) connect(addr string) (*amqp.Connection, error) {
 	connS.notifyConnClose = make(chan *amqp.Error)
 	connS.connection.NotifyClose(connS.notifyConnClose)
 
-	log.Println("Conn setup success!")
+	log.Info("Conn setup success!")
 
 	return conn, nil
 }

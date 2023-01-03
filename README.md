@@ -21,7 +21,13 @@
     producer.CloseProducer  关闭生产者
     producer.SendMsg    发送消息给mq
         - data：interface{}格式，一般为可json序列化的结构体（首字母大写）或 map[string]interface{}
-        
 ```
-
 ## 消费者 package consumer
+```text
+实现功能：
+    - 单connection，多channel/queue
+    - 支持rabbitmq的connection和channel重连
+    - 支持消息处理回调，会对回调进行recover处理
+    - 设置最大未确认ack数，达到后将不再消费，需处理并重启
+```
+ 

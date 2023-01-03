@@ -5,7 +5,7 @@ package producer
 
 import (
 	"github.com/streadway/amqp"
-	"log"
+	"go.slotsdev.info/server-group/gamelib/log"
 	"strconv"
 	"time"
 )
@@ -81,12 +81,13 @@ FOR1:
 		chS.isReady = false
 		err := chS.init(conn)
 		//err := errors.New("abc")
-		log.Println("Init channel: ", chS.index)
+		log.Info("Init channel: ", chS.index)
 
 		if err != nil {
-			log.Println("Failed to init channel. Retrying...")
+			log.Warn("Failed to init channel. Retrying...")
 			select {
 			case <-chS.done:
+				log.Info("Done channel : ", chS.index)
 				chS.isReady = false
 				// 在init错误的时候收到done信息, 直接关掉整个协程
 				break FOR1
@@ -100,20 +101,20 @@ FOR1:
 			select {
 			case <-chS.done:
 				chS.isReady = false
-				log.Println("Done channel : ", chS.index)
+				log.Info("Done channel : ", chS.index)
 				// 将chS.pushMap中的所有数据都返回
 				chS.emptyPushMap(DATA_PUSH_SESSION_DONE)
 				break FOR1
 
 			case <-chS.notifyChanClose:
 				// break FOR2, 重新跑FOR1循环
-				log.Println("Notify close channel : ", chS.index, " Rerunning init...")
+				log.Warn("Notify close channel : ", chS.index, " Rerunning init...")
 				// 将chS.pushMap中的所有数据都返回
 				chS.emptyPushMap(DATA_PUSH_CHAN_CLOSE)
 				break FOR2
 
 			case msg := <-chS.msgChan:
-				log.Println("Channel: ", chS.index, " receive msg:", msg)
+				log.Debug("Channel: ", chS.index, " receive msg:", msg)
 				// 发送消息
 				if !chS.isReady || chS.isThrottling { // 没准备好 或 限流
 					// 继续FOR2循环
@@ -134,17 +135,17 @@ FOR1:
 					},
 				)
 				if err != nil {
-					log.Println("Channel: ", chS.index, "publish err: ", err)
+					log.Warn("Channel: ", chS.index, "publish err: ", err)
 					msg.respChan <- &respSt{id: msg.id, pushState: DATA_PUSH_FAIL}
 					continue FOR2
 				}
-				log.Println("Channel: ", chS.index, "publish success")
+				log.Debug("Channel: ", chS.index, "publish success")
 				chS.pushCount++
 				chS.pushMap[chS.pushCount] = &pushStoreSt{id: msg.id, respChan: msg.respChan}
 				msg.respChan <- &respSt{id: msg.id, pushState: DATA_PUSH_SUCCESS}
 
 			case confirm := <-chS.notifyConfirm:
-				log.Println("index:", chS.index, "confirm:", confirm)
+				log.Debug("index:", chS.index, "confirm:", confirm)
 				pushStoreSt := chS.pushMap[confirm.DeliveryTag]
 				// todo 在rabbitmq控制台手动删除queue,有大概率收到notifyConfirm信息
 				// 		内容未amqp.Confirmation{DeliveryTag: 0, Ack: false}
@@ -172,12 +173,12 @@ FOR1:
 					// 超出容量限制且未限流
 					// todo 计算队列消息数, 如果超过, 设标记位, 一直到水位下降
 					// todo 添加通知, 看是否使用回调函数
-					log.Println("Channel:", chS.index, " change to true message num is ", queue.Messages)
+					log.Warn("Channel:", chS.index, " change to true message num is ", queue.Messages)
 					chS.isThrottling = true
 					continue FOR2
 				} else if queue.Messages <= (chS.volume/2) && chS.isThrottling == true {
 					// 低于容量且已限流
-					log.Println("Channel:", chS.index, " change to false message num is ", queue.Messages)
+					log.Warn("Channel:", chS.index, " change to false message num is ", queue.Messages)
 					chS.isThrottling = false
 					continue FOR2
 				}
@@ -217,6 +218,6 @@ func (chS *ChSession) init(conn *amqp.Connection) error {
 	chS.channel.NotifyPublish(chS.notifyConfirm)
 
 	chS.isReady = true
-	log.Println("Channel setup success!")
+	log.Info("Channel setup success!")
 	return nil
 }

@@ -10,9 +10,9 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
+	"go.slotsdev.info/server-group/gamelib/log"
 	"io"
 	"io/ioutil"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -48,7 +48,7 @@ const (
 	// 延迟发送时间
 	sendDelay = 1 * time.Second
 	// 延迟发送数量
-	msgNumDelay = 20 // 20
+	msgNumDelay = 10 // 10
 
 	// 定时检查发送失败的数据, 进行重发或写文件
 	resendOrDownDelay = 2 * time.Second
@@ -79,11 +79,11 @@ func NewProducer(prefixName, addr string, channelNum, queueVolume int) error {
 		queueVolume:    queueVolume,
 		loop:           0,
 		dataCount:      0,
-		dataChan:       make(chan interface{}, channelNum*10),
+		dataChan:       make(chan interface{}, 1000),
 		dataBuffer:     make([]interface{}, 0, msgNumDelay),
 		toBeConfirmMap: make(map[uint64][]byte),
 		failBuffer:     make([][]byte, 0, dataJsonBufferLimit),
-		respChan:       make(chan *respSt, channelNum*10),
+		respChan:       make(chan *respSt, 1000),
 		fileIdSlice:    make([]uint64, 0),
 		maxFileId:      0,
 		done:           make(chan bool),
@@ -130,12 +130,12 @@ func (producer *Producer) initLocalFile() error {
 	err := os.MkdirAll(fileDir, 0777)
 	if err != nil {
 		// todo 此处需要报错
-		log.Println("mkdir err:", err)
+		log.Error("mkdir err:", err)
 		return err
 	}
 	fileInfoList, err := ioutil.ReadDir(fileDir)
 	if err != nil {
-		log.Println("read dir err:", err)
+		log.Error("read dir err:", err)
 		return err
 	}
 	for _, v := range fileInfoList {
@@ -143,7 +143,7 @@ func (producer *Producer) initLocalFile() error {
 		splitSlice := strings.Split(v.Name(), fileNamePrefix)
 		fileId, err := strconv.ParseUint(splitSlice[1], 10, 64)
 		if err != nil {
-			log.Println("file id err:", err)
+			log.Error("file id err:", err)
 			return err
 		}
 		producer.fileIdSlice = append(producer.fileIdSlice, fileId)
@@ -167,7 +167,7 @@ func (producer *Producer) handleProducer() {
 			producer.toBeConfirmMap = make(map[uint64][]byte)
 			// 2. 将producer.dataBuffer中的数据同步到producer.failBuffer中
 			if len(producer.dataBuffer) > 0 {
-				log.Println("delay send! buffer: ", producer.dataBuffer)
+				log.Debug("delay send! buffer: ", producer.dataBuffer)
 				dataJson, _ := json.Marshal(producer.dataBuffer)
 				// todo 可以不用对json.Marshal的err处理, 能保证 producer.dataStrBuffer是slice
 				producer.failBuffer = append(producer.failBuffer, dataJson)
@@ -183,12 +183,12 @@ func (producer *Producer) handleProducer() {
 			// 放到data缓存中
 			producer.dataBuffer = append(producer.dataBuffer, data)
 			if len(producer.dataBuffer) >= msgNumDelay {
-				log.Println("now send, buffer: ", producer.dataBuffer)
+				log.Debug("now send, buffer: ", producer.dataBuffer)
 				producer.flushDataBuffer()
 			}
 
 		case resp := <-producer.respChan:
-			log.Println("resp is:", resp)
+			log.Debug("resp is:", resp)
 			if resp.pushState == DATA_PUSH_SUCCESS {
 				// push成功,不做任何事情
 			} else if resp.pushState == DATA_PUSH_ACK_SUCCESS {
@@ -206,19 +206,19 @@ func (producer *Producer) handleProducer() {
 					delete(producer.toBeConfirmMap, resp.id)
 				}
 			}
-			log.Println("dataJsonMap:", producer.toBeConfirmMap)
+			log.Debug("dataJsonMap:", producer.toBeConfirmMap)
 
 		case <-time.After(sendDelay):
 			// 定时清空接收的dataStr缓存
 			if len(producer.dataBuffer) > 0 {
-				log.Println("delay send! buffer: ", producer.dataBuffer)
+				log.Debug("delay send! buffer: ", producer.dataBuffer)
 				producer.flushDataBuffer()
 			}
 
 		case <-time.After(resendOrDownDelay):
 			// 定时处理发送queue失败的数据
 			if len(producer.failBuffer) > 0 {
-				log.Println("delay resend or down! buffer: ", producer.failBuffer)
+				log.Debug("delay resend or down! buffer: ", producer.failBuffer)
 				producer.flushFailBuffer()
 			}
 
@@ -238,7 +238,7 @@ func (producer *Producer) flushOneFile() {
 		producer.fileIdSlice = producer.fileIdSlice[1:]
 		file, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0666)
 		if err != nil {
-			log.Println("文件打开失败", err)
+			log.Error("文件打开失败", err)
 			return
 		}
 		reader := bufio.NewReader(file)
@@ -351,7 +351,7 @@ func (producer *Producer) sendToQueue(dataJson []byte, chS *ChSession) {
 		msg:      dataJson,
 		respChan: producer.respChan,
 	}
-	log.Println("send msg")
+	log.Debug("send msg")
 	producer.toBeConfirmMap[msg.id] = dataJson
 	chS.msgChan <- msg
 }
