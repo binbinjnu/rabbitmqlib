@@ -80,8 +80,9 @@ FOR1:
 			case d := <-chS.delivery:
 				log.Debug("d:", string(d.Body))
 				err := callback(d.Body)
-				if err == nil {
+				if err != nil {
 					log.Error("callback err: ", err)
+				} else {
 					d.Ack(false)
 				}
 			}
