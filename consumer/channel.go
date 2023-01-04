@@ -41,6 +41,12 @@ func NewChSession(prefixName string, index int) *ChSession {
 
 func (chS *ChSession) closeChSession() {
 	close(chS.done)
+	for {
+		if chS.isReady == false {
+			log.Debug("chS ", chS.index, " closed")
+			break
+		}
+	}
 	if chS.channel != nil {
 		chS.channel.Close()
 	}

@@ -115,9 +115,6 @@ func CloseProducer() {
 		v.closeChSession()
 	}
 	GConnSession.closeConnSession()
-
-	// sleep 2秒, 确保消息处理完毕
-	time.Sleep(2 * time.Second)
 	// 发消息给Producer, 处理手尾
 	close(GProducer.done)
 	for {
@@ -132,9 +129,8 @@ func CloseProducer() {
 
 // SendMsg 发送数据, 最终结构需要跟业务方定
 // 发送数据, 最终结构需要跟业务方定
-func SendMsg(data interface{}) error {
+func SendMsg(data interface{}) {
 	GProducer.dataChan <- data
-	return nil
 }
 
 func (producer *Producer) initLocalFile() error {
