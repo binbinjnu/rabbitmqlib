@@ -39,7 +39,7 @@ const (
 	reInitDelay = 5 * time.Second
 
 	// 计算队列消息数时间间隔
-	volumeCountDelay = 5 * time.Second
+	volumeCountTick = 5 * time.Second
 )
 
 func NewChSession(prefixName string, index, queueVolume int) *ChSession {
@@ -76,6 +76,7 @@ func (chS *ChSession) emptyPushMap(pushState int) {
 }
 
 func (chS *ChSession) handleChannel(conn *amqp.Connection) {
+	volumeCountTicker := time.NewTicker(volumeCountTick)
 FOR1:
 	for {
 		chS.isReady = false
@@ -161,7 +162,7 @@ FOR1:
 					delete(chS.pushMap, confirm.DeliveryTag)
 				}
 
-			case <-time.After(volumeCountDelay):
+			case <-volumeCountTicker.C:
 				// 继续handle的for循环
 				queue, err := chS.channel.QueueInspect(chS.name)
 				//err := errors.New("haha")

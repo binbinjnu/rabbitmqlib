@@ -47,6 +47,13 @@ func (connS *ConnSession) closeConnSession() {
 	if connS.connection != nil {
 		connS.connection.Close()
 	}
+	for {
+		if connS.isReady == false {
+			log.Debug("conn closed")
+			GConnSession = nil
+			break
+		}
+	}
 }
 
 func (connS *ConnSession) handleConn(addr string) {

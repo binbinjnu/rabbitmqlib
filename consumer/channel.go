@@ -26,6 +26,9 @@ const (
 
 	// channel exception后重新init的时长
 	reInitDelay = 5 * time.Second
+
+	// qos预先载入数量
+	qosPrefetchCount = 10
 )
 
 func NewChSession(prefixName string, index int) *ChSession {
@@ -81,7 +84,7 @@ FOR1:
 				log.Debug("d:", string(d.Body))
 				err := callback(d.Body)
 				if err != nil {
-					log.Error("callback err: ", err)
+					log.Warn("callback err: ", err)
 				} else {
 					d.Ack(false)
 				}
@@ -110,7 +113,7 @@ func (chS *ChSession) init(conn *amqp.Connection) error {
 	}
 
 	// 设置qos
-	err = ch.Qos(3, 0, false)
+	err = ch.Qos(qosPrefetchCount, 0, false)
 	if err != nil {
 		return err
 	}

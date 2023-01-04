@@ -34,6 +34,7 @@ type (
 		respChan       chan *respSt      // mqchannel反馈
 		fileIdSlice    []uint64          // 本地文件id的slice
 		maxFileId      uint64            // 最大文件id
+		isReady        bool
 		done           chan bool
 	}
 )
@@ -44,19 +45,19 @@ const (
 	// 文件名前缀
 	fileNamePrefix = "log_"
 
-	// 每sendDelay发一次或者数量超过msgNumDelay发一次
-	// 延迟发送时间
-	sendDelay = 1 * time.Second
+	// 间隔一定时间发一次或者数量超过msgNumDelay发一次
+	// 延迟发送时间间隔
+	sendTick = 1 * time.Second
 	// 延迟发送数量
 	msgNumDelay = 10 // 10
 
 	// 定时检查发送失败的数据, 进行重发或写文件
-	resendOrDownDelay = 2 * time.Second
+	resendOrDownTick = 2 * time.Second
 	// buffer的数量限制, 即累积超n条数据没法发送给queue时则写文件
 	dataJsonBufferLimit = 500 // 500
 
 	// 定时检查文件的数据, 搞出来发送给queue
-	checkFileDelay = 1 * time.Second
+	checkFileTick = 1 * time.Second
 )
 
 var (
@@ -71,6 +72,9 @@ func NewProducer(prefixName, addr string, channelNum, queueVolume int) error {
 	}
 	if queueVolume < 20 {
 		return errors.New("queue volume require a minimum of 20")
+	}
+	if GProducer != nil {
+		return errors.New("producer already start")
 	}
 	GProducer = &Producer{
 		prefixName:     prefixName,
@@ -116,6 +120,13 @@ func CloseProducer() {
 	time.Sleep(2 * time.Second)
 	// 发消息给Producer, 处理手尾
 	close(GProducer.done)
+	for {
+		if GProducer.isReady == false {
+			log.Debug("producer closed")
+			GProducer = nil
+			break
+		}
+	}
 	return
 }
 
@@ -155,6 +166,10 @@ func (producer *Producer) initLocalFile() error {
 }
 
 func (producer *Producer) handleProducer() {
+	producer.isReady = true
+	sendTicker := time.NewTicker(sendTick)
+	resendOrDownTicker := time.NewTicker(resendOrDownTick)
+	checkFileTicker := time.NewTicker(checkFileTick)
 	for {
 		select {
 		case <-producer.done:
@@ -178,6 +193,8 @@ func (producer *Producer) handleProducer() {
 			if len(producer.failBuffer) > 0 {
 				producer.writeFile()
 			}
+			producer.isReady = false
+			break
 
 		case data := <-producer.dataChan:
 			// 放到data缓存中
@@ -208,21 +225,21 @@ func (producer *Producer) handleProducer() {
 			}
 			log.Debug("dataJsonMap:", producer.toBeConfirmMap)
 
-		case <-time.After(sendDelay):
+		case <-sendTicker.C:
 			// 定时清空接收的dataStr缓存
 			if len(producer.dataBuffer) > 0 {
 				log.Debug("delay send! buffer: ", producer.dataBuffer)
 				producer.flushDataBuffer()
 			}
 
-		case <-time.After(resendOrDownDelay):
+		case <-resendOrDownTicker.C:
 			// 定时处理发送queue失败的数据
 			if len(producer.failBuffer) > 0 {
 				log.Debug("delay resend or down! buffer: ", producer.failBuffer)
 				producer.flushFailBuffer()
 			}
 
-		case <-time.After(checkFileDelay):
+		case <-checkFileTicker.C:
 			// 定时处理本地的文件
 			if len(producer.fileIdSlice) > 0 {
 				producer.flushOneFile()

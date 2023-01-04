@@ -24,14 +24,31 @@ func main() {
 		log.Debug("err:", err)
 		return
 	}
+	time.Sleep(2 * time.Second)
 
-	log.Debug("before time sleep")
-	time.Sleep(10 * time.Second)
-	log.Debug("after time sleep")
-	for i := 0; i < 10; i++ {
-		producer.SendMsg(map[string]interface{}{"int": i, "string": "abc"})
-		time.Sleep(400 * time.Millisecond)
+	producer.CloseProducer()
+
+	err = producer.NewProducer("dm_queue_", addr, 2, 100)
+	if err != nil {
+		log.Debug("err:", err)
+		return
 	}
+
+	//log.Debug("before time sleep")
+	//time.Sleep(5 * time.Second)
+	//log.Debug("after time sleep")
+	//for i := 0; i < 20; i++ {
+	//	log.Debug("send msg i: ", i)
+	//	producer.SendMsg(
+	//		map[string]interface{}{
+	//			"table":     "test_log",
+	//			"id":        i,
+	//			"string":    "index_" + strconv.Itoa(i),
+	//			"timestamp": time.Now().Unix(),
+	//			"datetime":  time.Now().Format("2006-01-02 15:04:05"),
+	//		})
+	//	time.Sleep(1 * time.Second)
+	//}
 	//mymq.Send([]byte("abc"))
 	//mymq.Send([]byte("efg"))
 	//mymq.Send([]byte("hij"))

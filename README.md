@@ -4,6 +4,7 @@
 ## 生产者 package producer
 ```text
 实现功能：
+    - 单例模式
     - 单connection，多channel/queue
     - 支持rabbitmq的connection和channel重连
     - 支持定时检测队列消息数，如果超出预设值，则将该队列设置成限量状态，不再向其发送消息，直至降低至预设值/2
@@ -25,6 +26,7 @@
 ## 消费者 package consumer
 ```text
 实现功能：
+    - 单例模式
     - 单connection，多channel/queue
     - 支持rabbitmq的connection和channel重连
     - 支持消息处理回调，会对回调进行recover处理
