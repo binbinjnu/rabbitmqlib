@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"go.slotsdev.info/server-group/gamelib/log"
-	"time"
 )
 
 type Consumer struct {
@@ -40,7 +39,6 @@ func CloseConsumer() {
 		v.closeChSession()
 	}
 	GConnSession.closeConnSession()
-	time.Sleep(1 * time.Second)
 	GConsumer = nil
 	return
 }

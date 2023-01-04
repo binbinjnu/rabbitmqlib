@@ -30,6 +30,18 @@
     - 单connection，多channel/queue
     - 支持rabbitmq的connection和channel重连
     - 支持消息处理回调，会对回调进行recover处理
-    - 设置最大未确认ack数，达到后将不再消费，需处理并重启
+    - 设置最大未确认ack数（consumer/channel.go中的qosPrefetchCount，当前为10），达到后将不再消费，需处理并重启
+    
+调用函数：
+    consumer.NewConsumer    新建消费者
+        - prefixName: 队列名前缀
+        - addr：URI地址，例（amqp://admin:123456@192.168.146.128:5672）
+        - channelNum：开启channel/queue的数量，最小值为1
+    consumer.CloseConsumer  关闭消费者
+    
+回调函数：
+    消费者消费消息时，调用consumer.callback，在里面做了recover处理，
+    确保程序正常运行，及时获取错误并进行处理。发生错误时，不会给mq回ack，
+    消息会到Unacked中，错误处理完毕后可重新消费。
 ```
  

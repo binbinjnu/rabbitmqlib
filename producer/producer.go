@@ -120,10 +120,10 @@ func CloseProducer() {
 	for {
 		if GProducer.isReady == false {
 			log.Debug("producer closed")
-			GProducer = nil
 			break
 		}
 	}
+	GProducer = nil
 	return
 }
 
