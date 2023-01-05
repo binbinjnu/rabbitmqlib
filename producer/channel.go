@@ -19,17 +19,12 @@ type (
 		channel         *amqp.Channel
 		notifyChanClose chan *amqp.Error
 		notifyConfirm   chan amqp.Confirmation
-		msgChan         chan *msgSt             // 有缓冲队列, 暂定1000, 足够一次性推1000条以内的日志过来
-		pushCount       uint64                  // 推送计数器, 与amqp.Confirmation.DeliveryTag一致
-		pushMap         map[uint64]*pushStoreSt // map[DeliveryTag]*pushStoreSt
+		msgChan         chan *msgSt       // 有缓冲队列, 暂定1000, 足够一次性推1000条以内的日志过来
+		pushCount       uint64            // 推送计数器, 与amqp.Confirmation.DeliveryTag一致
+		pushMap         map[uint64]uint64 // map[DeliveryTag]msg.id
 		done            chan bool
 		isThrottling    bool // 是否限流 (定时判断对应的mq的queue的消息数量, 超了则限流)
 		isReady         bool
-	}
-
-	pushStoreSt struct {
-		id       uint64       // msgSt.id
-		respChan chan *respSt // mqchannel反馈
 	}
 )
 
@@ -50,7 +45,7 @@ func NewChSession(prefixName string, index, queueVolume int) *ChSession {
 		done:      make(chan bool),
 		msgChan:   make(chan *msgSt, 1000),
 		pushCount: 0,
-		pushMap:   make(map[uint64]*pushStoreSt),
+		pushMap:   make(map[uint64]uint64),
 	}
 }
 
@@ -74,10 +69,10 @@ func (chS *ChSession) IsThrottling() bool {
 
 func (chS *ChSession) emptyPushMap(pushState int) {
 	// 将chS.pushMap中的所有数据都返回
-	for _, v := range chS.pushMap {
-		v.respChan <- &respSt{id: v.id, pushState: pushState}
+	for _, msgId := range chS.pushMap {
+		channelResp(msgId, pushState)
 	}
-	chS.pushMap = make(map[uint64]*pushStoreSt)
+	chS.pushMap = make(map[uint64]uint64)
 	chS.pushCount = 0
 }
 
@@ -126,7 +121,7 @@ FOR1:
 				if !chS.isReady || chS.isThrottling { // 没准备好 或 限流
 					// 继续FOR2循环
 					//log.Println("Index: ", chS.index, "not ready or throttling")
-					msg.respChan <- &respSt{id: msg.id, pushState: DATA_PUSH_FAIL}
+					channelResp(msg.id, DATA_PUSH_FAIL)
 					continue FOR2
 				}
 				// 处理error
@@ -143,27 +138,27 @@ FOR1:
 				)
 				if err != nil {
 					log.Warn("Channel: ", chS.index, "publish err: ", err)
-					msg.respChan <- &respSt{id: msg.id, pushState: DATA_PUSH_FAIL}
+					channelResp(msg.id, DATA_PUSH_FAIL)
 					continue FOR2
 				}
 				log.Debug("Channel: ", chS.index, "publish success")
 				chS.pushCount++
-				chS.pushMap[chS.pushCount] = &pushStoreSt{id: msg.id, respChan: msg.respChan}
-				msg.respChan <- &respSt{id: msg.id, pushState: DATA_PUSH_SUCCESS}
+				chS.pushMap[chS.pushCount] = msg.id
+				channelResp(msg.id, DATA_PUSH_SUCCESS)
 
 			case confirm := <-chS.notifyConfirm:
 				log.Debug("index:", chS.index, "confirm:", confirm)
-				pushStoreSt := chS.pushMap[confirm.DeliveryTag]
+				msgId := chS.pushMap[confirm.DeliveryTag]
 				// todo 在rabbitmq控制台手动删除queue,有大概率收到notifyConfirm信息
 				// 		内容未amqp.Confirmation{DeliveryTag: 0, Ack: false}
 				//		对此忽略DeliveryTag为0的信息
 				//		后续查明原因
-				if confirm.DeliveryTag != 0 && pushStoreSt != nil {
+				if confirm.DeliveryTag != 0 && msgId != 0 {
 					// 消息确认
 					if confirm.Ack {
-						pushStoreSt.respChan <- &respSt{id: pushStoreSt.id, pushState: DATA_PUSH_ACK_SUCCESS}
+						channelResp(msgId, DATA_PUSH_ACK_SUCCESS)
 					} else {
-						pushStoreSt.respChan <- &respSt{id: pushStoreSt.id, pushState: DATA_PUSH_ACK_FAIL}
+						channelResp(msgId, DATA_PUSH_ACK_FAIL)
 					}
 					delete(chS.pushMap, confirm.DeliveryTag)
 				}

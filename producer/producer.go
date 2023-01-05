@@ -133,6 +133,11 @@ func SendMsg(data interface{}) {
 	GProducer.dataChan <- data
 }
 
+// channel返回消息给GProducer
+func channelResp(id uint64, pushState int) {
+	GProducer.respChan <- &respSt{id: id, pushState: pushState}
+}
+
 func (producer *Producer) initLocalFile() error {
 	err := os.MkdirAll(fileDir, 0777)
 	if err != nil {
@@ -360,11 +365,10 @@ func (producer *Producer) hasChannel() bool {
 func (producer *Producer) sendToQueue(dataJson []byte, chS *ChSession) {
 	producer.dataCount++
 	msg := &msgSt{
-		id:       producer.dataCount,
-		msg:      dataJson,
-		respChan: producer.respChan,
+		id:  producer.dataCount,
+		msg: dataJson,
 	}
-	log.Debug("send msg")
+	log.Debug("send msg， count is ", producer.dataCount)
 	producer.toBeConfirmMap[msg.id] = dataJson
 	chS.msgChan <- msg
 }

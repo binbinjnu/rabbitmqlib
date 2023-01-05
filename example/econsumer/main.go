@@ -15,7 +15,7 @@ type st struct {
 var valueOfSt = reflect.ValueOf(&st{})
 
 func main() {
-	addr := "amqp://admin:123456@192.168.146.128:5672"
+	addr := "amqp://dmsoft:dmsoft123456@192.168.99.105:5672"
 	consumer.NewConsumer("dm_queue_", addr, 2, Control)
 	util.WaitClose()
 }

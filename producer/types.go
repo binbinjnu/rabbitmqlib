@@ -12,9 +12,8 @@ const (
 
 type (
 	msgSt struct {
-		id       uint64
-		msg      []byte
-		respChan chan *respSt // mqchannel反馈
+		id  uint64
+		msg []byte
 	}
 
 	respSt struct {
