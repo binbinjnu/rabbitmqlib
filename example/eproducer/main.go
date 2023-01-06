@@ -25,10 +25,18 @@ func main() {
 		log.Debug("err:", err)
 		return
 	}
+	defer producer.CloseProducer()
+
+	go send()
+
+	util.WaitClose()
+}
+
+func send() {
 	log.Debug("before time sleep")
 	time.Sleep(5 * time.Second)
 	log.Debug("after time sleep")
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 100; i++ {
 		log.Debug("send msg i: ", i)
 		producer.SendMsg(
 			map[string]interface{}{
@@ -38,9 +46,5 @@ func main() {
 				"timestamp": time.Now().Unix(),
 				"datetime":  time.Now().Format("2006-01-02 15:04:05"),
 			})
-		time.Sleep(1 * time.Second)
 	}
-	util.WaitClose()
-	producer.CloseProducer()
-
 }

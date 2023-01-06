@@ -7,6 +7,9 @@ import (
 )
 
 func main() {
+
+	str := "a\nb"
+	fmt.Println("str:", str)
 	ticker1 := time.NewTicker(1 * time.Second)
 	ticker2 := time.NewTicker(2 * time.Second)
 	ticker3 := time.NewTicker(1 * time.Second)
@@ -22,5 +25,6 @@ func main() {
 			}
 		}
 	}()
+
 	util.WaitClose()
 }

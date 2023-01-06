@@ -54,7 +54,7 @@ const (
 	// 定时检查发送失败的数据, 进行重发或写文件
 	resendOrDownTick = 2 * time.Second
 	// buffer的数量限制, 即累积超n条数据没法发送给queue时则写文件
-	dataJsonBufferLimit = 500 // 500
+	dataJsonBufferLimit = 1000 // 1000
 
 	// 定时检查文件的数据, 搞出来发送给queue
 	checkFileTick = 1 * time.Second
@@ -174,6 +174,7 @@ func (producer *Producer) handleProducer() {
 	for {
 		select {
 		case <-producer.done:
+			log.Debug("done!")
 			// 关闭, 需要把数据处理完
 			// 1. 将producer.toBeConfirmMap中的数据同步到producer.failBuffer中
 			for _, v := range producer.toBeConfirmMap {
@@ -201,7 +202,7 @@ func (producer *Producer) handleProducer() {
 			// 放到data缓存中
 			producer.dataBuffer = append(producer.dataBuffer, data)
 			if len(producer.dataBuffer) >= msgNumDelay {
-				log.Debug("now send, buffer: ", producer.dataBuffer)
+				log.Debug("now send, buffer")
 				producer.flushDataBuffer()
 			}
 
@@ -224,19 +225,18 @@ func (producer *Producer) handleProducer() {
 					delete(producer.toBeConfirmMap, resp.id)
 				}
 			}
-			log.Debug("dataJsonMap:", producer.toBeConfirmMap)
 
 		case <-sendTicker.C:
 			// 定时清空接收的dataStr缓存
 			if len(producer.dataBuffer) > 0 {
-				log.Debug("delay send! buffer: ", producer.dataBuffer)
+				log.Debug("delay send! buffer")
 				producer.flushDataBuffer()
 			}
 
 		case <-resendOrDownTicker.C:
 			// 定时处理发送queue失败的数据
 			if len(producer.failBuffer) > 0 {
-				log.Debug("delay resend or down! buffer: ", producer.failBuffer)
+				log.Debug("delay resend or down! buffer")
 				producer.flushFailBuffer()
 			}
 
@@ -261,8 +261,21 @@ func (producer *Producer) flushOneFile() {
 		}
 		reader := bufio.NewReader(file)
 		for {
-			dataJson, _, err := reader.ReadLine()
-			if dataJson != nil && len(dataJson) != 0 {
+			// ReadLine有坑，默认最多读4096个byte
+			//dataJson, _, err := reader.ReadLine()
+			dataJson, err := reader.ReadBytes('\n')
+			if err == io.EOF {
+				break
+			}
+			if dataJson != nil && len(dataJson) > 0 {
+				if dataJson[len(dataJson)-1] == '\n' {
+					drop := 1
+					if len(dataJson) > 1 && dataJson[len(dataJson)-2] == '\r' {
+						drop = 2
+					}
+					dataJson = dataJson[:len(dataJson)-drop]
+				}
+
 				chS := producer.chooseChannel()
 				if chS == nil {
 					// 没有合适的channel, 放到本地缓存中
@@ -271,9 +284,6 @@ func (producer *Producer) flushOneFile() {
 					// 有合适的channel, 发给channel
 					producer.sendToQueue(dataJson, chS)
 				}
-			}
-			if err == io.EOF {
-				break
 			}
 		}
 		// 及时关闭file句柄
@@ -387,7 +397,7 @@ func (producer *Producer) writeFile() {
 	writer := bufio.NewWriter(file)
 	for _, v := range producer.failBuffer {
 		writer.Write(v)
-		writer.WriteString("\n")
+		writer.Write([]byte{'\n'})
 	}
 	//Flush将缓存的文件真正写入到文件中
 	writer.Flush()

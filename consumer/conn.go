@@ -43,18 +43,22 @@ func Open(prefixName, addr string, channelNum int) {
 }
 
 func (connS *ConnSession) closeConnSession() {
-	close(connS.done)
-	// 等待connS关闭
-	for {
-		if connS.isReady == false {
-			log.Debug("conn closed")
-			break
+	if connS != nil {
+		if connS.done != nil {
+			close(connS.done)
 		}
+		// 等待connS关闭
+		for {
+			if connS.isReady == false {
+				log.Debug("conn closed")
+				break
+			}
+		}
+		if connS.connection != nil {
+			connS.connection.Close()
+		}
+		GConnSession = nil
 	}
-	if connS.connection != nil {
-		connS.connection.Close()
-	}
-	GConnSession = nil
 }
 
 func (connS *ConnSession) handleConn(addr string) {

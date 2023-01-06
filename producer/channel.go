@@ -50,15 +50,19 @@ func NewChSession(prefixName string, index, queueVolume int) *ChSession {
 }
 
 func (chS *ChSession) closeChSession() {
-	close(chS.done)
-	for {
-		if chS.isReady == false {
-			log.Debug("chS ", chS.index, " closed")
-			break
+	if chS != nil {
+		if chS.done != nil {
+			close(chS.done)
 		}
-	}
-	if chS.channel != nil {
-		chS.channel.Close()
+		for {
+			if chS.isReady == false {
+				log.Debug("chS ", chS.index, " closed")
+				break
+			}
+		}
+		if chS.channel != nil {
+			chS.channel.Close()
+		}
 	}
 }
 
@@ -116,7 +120,7 @@ FOR1:
 				break FOR2
 
 			case msg := <-chS.msgChan:
-				log.Debug("Channel: ", chS.index, " receive msg:", msg)
+				//log.Debug("Channel: ", chS.index, " receive msg:", string(msg.msg))
 				// 发送消息
 				if !chS.isReady || chS.isThrottling { // 没准备好 或 限流
 					// 继续FOR2循环

@@ -62,6 +62,7 @@ func callback(data []byte) (err error) {
 	s := make([]interface{}, 0)
 	err = json.Unmarshal(data, &s)
 	if err != nil {
+		log.Warn("json unmarshal err, data:", string(data))
 		return err
 	}
 	for _, v = range s {
