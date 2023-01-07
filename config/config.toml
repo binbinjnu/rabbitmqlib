@@ -2,7 +2,7 @@
     # 日志输出文件
     file = "./log/dm.log"
     # 日志输出级别，可选：debug | info | warn | error | fatal | panic
-    level = "debug"
+    level = "info"
     # 日志输出格式，可选：text | json
     format = "text"
     # 是否输出到终端

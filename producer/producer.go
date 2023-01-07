@@ -27,7 +27,7 @@ type (
 		queueVolume    int
 		loop           int               // 循环选择channel的计数
 		dataCount      uint64            // 接受到的消息计数器, 可用于生成msgSt的id
-		dataChan       chan interface{}  // 有缓冲队列	接收其它地方发送过来的数据
+		dataChan       chan interface{}  // 有缓冲队列	接收其它地方发送过来的数据(缓冲大小不能太大，确保不会导致生产者阻塞)
 		dataBuffer     []interface{}     // interface{}的slice, 缓存其它地方发过来的数据, 定时聚合同步给queue
 		toBeConfirmMap map[uint64][]byte // 存储已同步给queue的待确认的数据 key为msgSt的id, 值为json.Marshal(producer.dataBuffer)
 		failBuffer     [][]byte          // 缓存queue确认失败或没法发送给queue的数据, 定时重发或写文件 json.Marshal(producer.dataBuffer)格式的切片
@@ -53,7 +53,7 @@ const (
 
 	// 定时检查发送失败的数据, 进行重发或写文件
 	resendOrDownTick = 2 * time.Second
-	// buffer的数量限制, 即累积超n条数据没法发送给queue时则写文件
+	// buffer的数量限制, 即累积超n组数据没法发送给queue时则写文件
 	dataJsonBufferLimit = 1000 // 1000
 
 	// 定时检查文件的数据, 搞出来发送给queue
@@ -87,7 +87,7 @@ func NewProducer(prefixName, addr string, channelNum, queueVolume int) error {
 		dataBuffer:     make([]interface{}, 0, msgNumDelay),
 		toBeConfirmMap: make(map[uint64][]byte),
 		failBuffer:     make([][]byte, 0, dataJsonBufferLimit),
-		respChan:       make(chan *respSt, 1000),
+		respChan:       make(chan *respSt, 2000),
 		fileIdSlice:    make([]uint64, 0),
 		maxFileId:      0,
 		done:           make(chan bool),

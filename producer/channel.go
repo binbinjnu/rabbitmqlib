@@ -18,10 +18,10 @@ type (
 		volume          int    // 队列容量限制
 		channel         *amqp.Channel
 		notifyChanClose chan *amqp.Error
-		notifyConfirm   chan amqp.Confirmation
-		msgChan         chan *msgSt       // 有缓冲队列, 暂定1000, 足够一次性推1000条以内的日志过来
-		pushCount       uint64            // 推送计数器, 与amqp.Confirmation.DeliveryTag一致
-		pushMap         map[uint64]uint64 // map[DeliveryTag]msg.id
+		notifyConfirm   chan amqp.Confirmation // 有缓冲队列, 需要足够生产者接受消息速度，暂定2000
+		msgChan         chan *msgSt            // 有缓冲队列, 暂定2000, 足够一次性推2000条以内的日志过来
+		pushCount       uint64                 // 推送计数器, 与amqp.Confirmation.DeliveryTag一致
+		pushMap         map[uint64]uint64      // map[DeliveryTag]msg.id
 		done            chan bool
 		isThrottling    bool // 是否限流 (定时判断对应的mq的queue的消息数量, 超了则限流)
 		isReady         bool
@@ -43,7 +43,7 @@ func NewChSession(prefixName string, index, queueVolume int) *ChSession {
 		name:      prefixName + strconv.Itoa(index),
 		volume:    queueVolume,
 		done:      make(chan bool),
-		msgChan:   make(chan *msgSt, 1000),
+		msgChan:   make(chan *msgSt, 2000),
 		pushCount: 0,
 		pushMap:   make(map[uint64]uint64),
 	}
@@ -219,7 +219,7 @@ func (chS *ChSession) init(conn *amqp.Connection) error {
 
 	chS.channel = ch
 	chS.notifyChanClose = make(chan *amqp.Error, 10)
-	chS.notifyConfirm = make(chan amqp.Confirmation, 10)
+	chS.notifyConfirm = make(chan amqp.Confirmation, 2000)
 	chS.channel.NotifyClose(chS.notifyChanClose)
 	chS.channel.NotifyPublish(chS.notifyConfirm)
 
