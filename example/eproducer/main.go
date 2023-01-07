@@ -42,6 +42,7 @@ func send() {
 			map[string]interface{}{
 				"table":     "test_log",
 				"id":        i,
+				"string":    "index_" + strconv.Itoa(i),
 				"string0":   "index_" + strconv.Itoa(i),
 				"string1":   "index_" + strconv.Itoa(i),
 				"string2":   "index_" + strconv.Itoa(i),
