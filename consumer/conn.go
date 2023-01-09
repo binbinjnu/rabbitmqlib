@@ -13,6 +13,7 @@ type (
 	// conn的session
 	ConnSession struct {
 		prefixName      string
+		addr            string
 		connection      *amqp.Connection
 		channelNum      int
 		channelMap      map[int]*ChSession
@@ -22,24 +23,19 @@ type (
 	}
 )
 
-var (
-	GConnSession *ConnSession
-)
-
 const (
 	// connection的重连时长
 	reconnectDelay = 5 * time.Second
 )
 
-// 开启
-func Open(prefixName, addr string, channelNum int) {
-	GConnSession = &ConnSession{
+func NewConnSession(prefixName, addr string, channelNum int) *ConnSession {
+	return &ConnSession{
 		prefixName: prefixName,
+		addr:       addr,
 		channelNum: channelNum,
 		channelMap: make(map[int]*ChSession),
 		done:       make(chan bool),
 	}
-	go GConnSession.handleConn(addr)
 }
 
 func (connS *ConnSession) closeConnSession() {
@@ -57,16 +53,15 @@ func (connS *ConnSession) closeConnSession() {
 		if connS.connection != nil {
 			connS.connection.Close()
 		}
-		GConnSession = nil
 	}
 }
 
-func (connS *ConnSession) handleConn(addr string) {
+func (connS *ConnSession) handleConn() {
 FOR1:
 	for {
 		connS.isReady = false
 		log.Info("Attempting to connect")
-		conn, err := connS.connect(addr)
+		conn, err := connS.connect(connS.addr)
 		if err != nil {
 			log.Warn("Failed to connect. Retrying...")
 			select {

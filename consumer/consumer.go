@@ -7,7 +7,8 @@ import (
 )
 
 type Consumer struct {
-	callback func(interface{}) error
+	callback    func(interface{}) error
+	connSession *ConnSession
 }
 
 var (
@@ -24,21 +25,22 @@ func NewConsumer(prefixName, addr string, channelNum int, callback func(interfac
 		return errors.New("consumer already start")
 	}
 	GConsumer = &Consumer{
-		callback: callback,
+		callback:    callback,
+		connSession: NewConnSession(prefixName, addr, channelNum),
 	}
-	Open(prefixName, addr, channelNum)
+	go GConsumer.connSession.handleConn()
 	return nil
 }
 
 // CloseConsumer 关闭消费者
 func CloseConsumer() {
-	if GConnSession == nil {
+	if GConsumer.connSession == nil {
 		return
 	}
-	for _, v := range GConnSession.channelMap {
+	for _, v := range GConsumer.connSession.channelMap {
 		v.closeChSession()
 	}
-	GConnSession.closeConnSession()
+	GConsumer.connSession.closeConnSession()
 	GConsumer = nil
 	return
 }

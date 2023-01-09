@@ -25,6 +25,7 @@ type (
 		addr           string
 		channelNum     int
 		queueVolume    int
+		connSession    *ConnSession
 		loop           int               // 循环选择channel的计数
 		dataCount      uint64            // 接受到的消息计数器, 可用于生成msgSt的id
 		dataChan       chan interface{}  // 有缓冲队列	接收其它地方发送过来的数据(缓冲大小不能太大，确保不会导致生产者阻塞)
@@ -97,8 +98,7 @@ func NewProducer(prefixName, addr string, channelNum, queueVolume int) error {
 		// 初始化本地file不成功
 		return err
 	}
-	Open(prefixName, addr, channelNum, queueVolume)
-	// 开启协程去发送消息
+	// 开启协程
 	go GProducer.handleProducer()
 	return nil
 }
@@ -108,13 +108,13 @@ func CloseProducer() {
 	if GProducer == nil {
 		return
 	}
-	if GConnSession == nil {
+	if GProducer.connSession == nil {
 		return
 	}
-	for _, v := range GConnSession.channelMap {
+	for _, v := range GProducer.connSession.channelMap {
 		v.closeChSession()
 	}
-	GConnSession.closeConnSession()
+	GProducer.connSession.closeConnSession()
 	// 发消息给Producer, 处理手尾
 	close(GProducer.done)
 	for {
@@ -167,6 +167,9 @@ func (producer *Producer) initLocalFile() error {
 }
 
 func (producer *Producer) handleProducer() {
+	producer.connSession = NewConnSession(producer.prefixName, producer.addr, producer.channelNum, producer.queueVolume)
+	// 开启connSession协程
+	go producer.connSession.handleConn()
 	producer.isReady = true
 	sendTicker := time.NewTicker(sendTick)
 	resendOrDownTicker := time.NewTicker(resendOrDownTick)
@@ -336,11 +339,11 @@ func (producer *Producer) flushFailBuffer() {
 
 // 选择
 func (producer *Producer) chooseChannel() *ChSession {
-	if !GConnSession.isReady {
+	if !GProducer.connSession.isReady {
 		return nil
 	}
 	for i := 0; i < producer.channelNum; i++ {
-		chS := GConnSession.channelMap[producer.loop]
+		chS := GProducer.connSession.channelMap[producer.loop]
 		// loop+1
 		producer.loop = (producer.loop + 1) % producer.channelNum
 		if !chS.isReady || chS.isThrottling {
@@ -356,11 +359,11 @@ func (producer *Producer) chooseChannel() *ChSession {
 
 // 判断是否有合适的channel
 func (producer *Producer) hasChannel() bool {
-	if !GConnSession.isReady {
+	if !GProducer.connSession.isReady {
 		return false
 	}
 	for i := 0; i < producer.channelNum; i++ {
-		chS := GConnSession.channelMap[i]
+		chS := GProducer.connSession.channelMap[i]
 		if chS == nil || !chS.isReady || chS.isThrottling {
 			// 该chS不合适, 继续下一个
 			continue

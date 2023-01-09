@@ -13,8 +13,10 @@ type (
 	// conn的session
 	ConnSession struct {
 		prefixName      string
+		addr            string
 		connection      *amqp.Connection
 		channelNum      int
+		queueVolume     int
 		channelMap      map[int]*ChSession
 		notifyConnClose chan *amqp.Error
 		done            chan bool
@@ -22,24 +24,20 @@ type (
 	}
 )
 
-var (
-	GConnSession *ConnSession
-)
-
 const (
 	// connection的重连时长
 	reconnectDelay = 5 * time.Second
 )
 
-// 开启
-func Open(prefixName, addr string, channelNum, queueVolume int) {
-	GConnSession = &ConnSession{
-		prefixName: prefixName,
-		channelNum: channelNum,
-		channelMap: make(map[int]*ChSession),
-		done:       make(chan bool),
+func NewConnSession(prefixName, addr string, channelNum, queueVolume int) *ConnSession {
+	return &ConnSession{
+		prefixName:  prefixName,
+		addr:        addr,
+		channelNum:  channelNum,
+		queueVolume: queueVolume,
+		channelMap:  make(map[int]*ChSession),
+		done:        make(chan bool),
 	}
-	go GConnSession.handleConn(addr, queueVolume)
 }
 
 func (connS *ConnSession) closeConnSession() {
@@ -56,16 +54,15 @@ func (connS *ConnSession) closeConnSession() {
 		if connS.connection != nil {
 			connS.connection.Close()
 		}
-		GConnSession = nil
 	}
 }
 
-func (connS *ConnSession) handleConn(addr string, queueVolume int) {
+func (connS *ConnSession) handleConn() {
 FOR1:
 	for {
 		connS.isReady = false
 		log.Info("Attempting to connect")
-		conn, err := connS.connect(addr)
+		conn, err := connS.connect(connS.addr)
 		if err != nil {
 			log.Warn("Failed to connect. Retrying...")
 			select {
@@ -84,7 +81,7 @@ FOR1:
 		connS.channelMap = make(map[int]*ChSession)
 		// 建立n个channel并绑定
 		for i := 0; i < connS.channelNum; i++ {
-			chSession := NewChSession(connS.prefixName, i, queueVolume)
+			chSession := NewChSession(connS.prefixName, i, connS.queueVolume)
 			go chSession.handleChannel(conn)
 			connS.channelMap[i] = chSession
 		}
